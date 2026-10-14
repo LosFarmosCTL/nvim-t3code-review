@@ -91,6 +91,7 @@ The popup title shows the selected thread.
 | `Ctrl-T`           | Switch thread while keeping the comment |
 | `Ctrl-C`           | Cancel                                  |
 | `q` in Normal mode | Cancel                                  |
+| `Esc` in Normal mode | Cancel                                |
 
 ### Code Review window
 

@@ -33,7 +33,7 @@ function M.comment(opts)
     footer = ' Ctrl-S: '
       .. (opts.action or 'add to review')
       .. (opts.thread and '   Ctrl-T: switch thread' or '')
-      .. '   q (normal): cancel ',
+      .. ' ',
   })
   vim.wo[window].wrap = true
 
@@ -45,6 +45,7 @@ function M.comment(opts)
   end
 
   vim.keymap.set('n', 'q', close, { buffer = buffer, nowait = true })
+  vim.keymap.set('n', '<Esc>', close, { buffer = buffer, nowait = true })
   vim.keymap.set({ 'n', 'i' }, '<C-c>', close, { buffer = buffer })
 
   if opts.thread then
