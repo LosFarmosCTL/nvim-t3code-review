@@ -111,7 +111,7 @@ local function comment(reference, text, action, save, title)
     title = title or 'Add review comment',
     recipient = function()
       local target = Session.get(reference.root).target
-      return target and target.name or 'choose a thread with Ctrl-T'
+      return target and target.name or nil
     end,
     thread = function(updated)
       M.review_thread({ root = reference.root }, updated)
@@ -264,6 +264,7 @@ M.connect, M.doctor = Connection.connect, Connection.doctor
 
 function M.setup(opts)
   opts = opts or {}
+  require('t3code_review.appearance').setup(opts)
   Delivery.setup(opts.app)
   Connection.setup(opts.connection)
   Session.setup(opts.review)

@@ -1,4 +1,5 @@
 local M = {}
+local Appearance = require 't3code_review.appearance'
 
 ---A normal Neovim buffer for multiline review comments.
 ---save(comment, done) calls done(error) to retain the popup, or done(nil) to close.
@@ -11,7 +12,13 @@ function M.comment(opts)
   local width = math.max(1, math.min(76, vim.o.columns - 4))
   local height = math.max(1, math.min(10, vim.o.lines - 5))
   local function title()
-    return ' ' .. (opts.title or 'Add review comment') .. (opts.recipient and ' → ' .. opts.recipient() or '') .. ' '
+    local chunks = { { ' ' .. (opts.title or 'Add review comment') } }
+    if opts.recipient then
+      chunks[#chunks + 1] = { ' · ' .. Appearance.label('thread', 'Thread: ') }
+      chunks[#chunks + 1] = { opts.recipient() or 'none selected', 'T3ReviewThread' }
+    end
+    chunks[#chunks + 1] = { ' ' }
+    return chunks
   end
 
   local window = vim.api.nvim_open_win(buffer, true, {

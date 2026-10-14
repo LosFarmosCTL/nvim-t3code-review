@@ -1,4 +1,5 @@
 local M = {}
+local Appearance = require 't3code_review.appearance'
 local active_root
 
 function M.open(root, opts)
@@ -25,14 +26,30 @@ local function root(view)
   return view.opts.params.root
 end
 
-function M.header(checkout)
+local function summary(checkout)
   local review = require('t3code_review.session').get(checkout)
   local count = #review.items
-  return 'Code Review · '
+  local prefix = ' ' .. Appearance.label('review', 'Code Review')
+    .. ' · '
     .. count
     .. (count == 1 and ' comment' or ' comments')
-    .. ' → '
-    .. (review.target and review.target.name or 'choose a thread')
+    .. ' · '
+  return prefix, review.target and review.target.name or nil
+end
+
+function M.header(checkout)
+  local prefix, name = summary(checkout)
+  return prefix .. Appearance.thread(name)
+end
+
+function M.winbar(checkout)
+  local prefix, name = summary(checkout)
+  local focused = not vim.g.actual_curwin or tonumber(vim.g.actual_curwin) == vim.api.nvim_get_current_win()
+  -- The winbar re-evaluates this result; thread titles may contain literal percent signs.
+  return (prefix .. Appearance.label('thread', 'Thread: ')):gsub('%%', '%%%%')
+    .. (focused and '%#T3ReviewThread#' or '%*')
+    .. (name or 'none selected'):gsub('%%', '%%%%')
+    .. '%*'
 end
 
 M.config = {
@@ -47,9 +64,9 @@ M.config = {
         opts.params.root = opts.params.root or require('t3code_review.path').root()
 
         opts.win.wo = opts.win.wo or {}
-        opts.win.wo.winbar = "%{v:lua.require'trouble.sources.t3_review'.header("
+        opts.win.wo.winbar = "%{%v:lua.require'trouble.sources.t3_review'.winbar("
           .. string.format('%q', opts.params.root)
-          .. ')}%=%#Comment#e edit · dd remove · s draft · S send · C clear · t switch thread · ? help%*'
+          .. ')%}%=%#Comment#e edit · dd remove · s draft · S send · C clear · t switch thread · ? help%*'
       end,
       open_no_results = true,
       warn_no_results = false,

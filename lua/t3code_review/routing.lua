@@ -1,4 +1,5 @@
 local Connection = require 't3code_review.connection'
+local Appearance = require 't3code_review.appearance'
 local M = {}
 
 local picking = {}
@@ -78,7 +79,7 @@ function M.pick(opts, done)
   local function new_thread(project, status)
     local function launch()
       vim.ui.input(
-        { prompt = 'Review thread title: ', default = 'Code review · ' .. vim.fs.basename(root) },
+            { prompt = 'Review thread title: ', default = 'Code review · ' .. vim.fs.basename(root) },
         function(title)
           if not title or not title:match '%S' then
             finish(nil)
@@ -156,7 +157,7 @@ function M.pick(opts, done)
         end
 
         local rows = vim.deepcopy(result.threads)
-        rows[#rows + 1] = { action = 'new', name = '+ New review thread in this checkout' }
+        rows[#rows + 1] = { action = 'new', name = 'New review thread in this checkout' }
         rows[#rows + 1] = { action = 'settled', name = settled and '← Active threads' or 'Browse settled threads…' }
         rows[#rows + 1] = { action = 'project', name = 'Choose another project…' }
 
@@ -164,11 +165,12 @@ function M.pick(opts, done)
           prompt = 'T3 review thread · ' .. project.title,
           format_item = function(row)
             if row.action then
-              return row.name
+              local kind = row.action == 'new' and 'add' or row.action == 'settled' and 'archive' or 'project'
+              return Appearance.label(kind, row.name)
             end
 
             local match = row.same_checkout and 'same checkout' or 'other checkout'
-            local branch = type(row.branch) == 'string' and ' · ' .. row.branch or ''
+            local branch = type(row.branch) == 'string' and ' · ' .. Appearance.label('branch', row.branch) or ''
             return row.name .. '  [' .. row.status .. ' · ' .. match .. branch .. ']'
           end,
         }, function(row)
@@ -239,7 +241,7 @@ function M.pick(opts, done)
       vim.ui.select(result.projects, {
         prompt = 'T3 project for this review',
         format_item = function(project)
-          return project.title .. '  [' .. project.match .. ']  ' .. project.workspaceRoot
+          return Appearance.label('project', project.title) .. '  [' .. project.match .. ']  ' .. project.workspaceRoot
         end,
       }, function(project)
         if project then

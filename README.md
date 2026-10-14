@@ -152,6 +152,7 @@ With lazy.nvim, put overrides in `opts`. Otherwise, pass them to `setup()`:
 
 ```lua
 require('t3code_review').setup {
+  icons = true, -- Set false to disable Nerd Font icons
   app = 'T3 Code (Nightly)',
   connection = {
     node = 'node',
