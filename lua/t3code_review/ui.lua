@@ -30,12 +30,21 @@ function M.comment(opts)
     style = 'minimal',
     border = 'rounded',
     title = title(),
-    footer = ' Ctrl-S: '
+    title_pos = 'center',
+    footer_pos = 'center',
+    footer = ' <C-s> '
       .. (opts.action or 'add to review')
-      .. (opts.thread and '   Ctrl-T: switch thread' or '')
+      .. (opts.thread and ' · <C-t> switch thread' or '')
       .. ' ',
   })
   vim.wo[window].wrap = true
+  vim.wo[window].winbar = height > 1 and ' ' or ''
+  vim.wo[window].foldcolumn = tostring(math.min(2, width - 1))
+  vim.wo[window].foldenable = false
+  vim.wo[window].statuscolumn = '  '
+  local highlights = vim.wo[window].winhighlight
+  vim.wo[window].winhighlight = (highlights ~= '' and highlights .. ',' or '')
+    .. 'WinBar:NormalFloat,WinBarNC:NormalFloat,FoldColumn:NormalFloat'
 
   local saving = false
   local function close()
