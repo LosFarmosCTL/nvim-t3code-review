@@ -143,21 +143,15 @@ function M.add_review(opts)
   return run(function()
     opts = opts or {}
     local reference = M.capture(opts)
-    local view = review_window(reference.root)
-    if not view then
-      return
-    end
+    with_target(reference.root, reference.path, function(target)
+      if not target then
+        return
+      end
 
-    view:wait(function()
-      with_target(reference.root, reference.path, function(target)
-        if not target then
-          return
-        end
-
-        comment(reference, opts.comment, 'add to review', function(text, done)
-          Session.add(reference, text)
-          done(nil)
-        end)
+      comment(reference, opts.comment, 'add to review', function(text, done)
+        Session.add(reference, text)
+        done(nil)
+        review_window(reference.root)
       end)
     end)
   end)

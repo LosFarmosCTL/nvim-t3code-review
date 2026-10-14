@@ -102,15 +102,7 @@ local function save_comment(text)
   error 'Comment save key missing'
 end
 
--- Start, select lines, comment, navigate, edit, then stage one reference-only review.
-vim.cmd 'T3ReviewStart'
-t3.start_review()
-wait(function()
-  return trouble.is_open 't3_review'
-end)
-
-assert(#require('trouble.view').get { mode = 't3_review' } == 1)
-
+-- Select lines, comment, resume, navigate, edit, then stage one reference-only review.
 vim.api.nvim_set_current_win(window)
 vim.api.nvim_win_set_cursor(0, { 2, 0 })
 vim.cmd.normal { args = { 'Vj' }, bang = true }
@@ -120,6 +112,7 @@ wait(function()
 end)
 
 local popup = vim.api.nvim_get_current_buf()
+assert(not trouble.is_open 't3_review')
 vim.api.nvim_buf_set_lines(popup, 0, -1, false, { 'Keep this comment while switching' })
 
 for _, key in ipairs(vim.api.nvim_buf_get_keymap(popup, 'n')) do
@@ -134,9 +127,20 @@ assert(
 )
 
 save_comment 'Move retry ownership'
+local ready = false
+require('trouble.view').get({ mode = 't3_review' })[1].view:wait(function()
+  ready = true
+end)
+wait(function()
+  return ready
+end)
 wait(function()
   return #trouble.get_items 't3_review' == 1
 end)
+
+vim.cmd 'T3ReviewStart'
+t3.start_review()
+assert(#require('trouble.view').get { mode = 't3_review' } == 1)
 
 local item = t3.session.items(root)[1]
 assert(item.reference.first == 2 and item.reference.last == 3 and item.reference.text == nil)
