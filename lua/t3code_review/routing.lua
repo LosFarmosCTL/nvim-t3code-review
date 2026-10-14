@@ -3,8 +3,8 @@ local M = {}
 
 local picking = {}
 
-local function notify(message)
-  vim.notify(message, vim.log.levels.ERROR, { title = 'nvim-t3code-review' })
+local function notify(message, level)
+  vim.notify(message, level or vim.log.levels.ERROR, { title = 'nvim-t3code-review' })
 end
 
 function M.validate(target, root, done)
@@ -107,6 +107,7 @@ function M.pick(opts, done)
                 notify(create_err.message)
                 choose_thread(project, false)
               else
+                notify('Created review thread: ' .. result.target.name, vim.log.levels.INFO)
                 finish(result.target)
               end
             end)
