@@ -11,6 +11,7 @@ local root = vim.uv.fs_realpath(temp .. '/checkout')
 local target = { environment_id = 'env', project_id = 'project', thread_id = 'architecture', name = 'Architecture' }
 local choose, failure, handed_off, delivery, send_params = nil, nil, nil, nil, nil
 local can_operate, authorization = true, nil
+local creation_ceiling = 'full-access'
 
 connection.request = function(operation, params, done)
   if failure then
@@ -34,6 +35,8 @@ connection.request = function(operation, params, done)
   elseif operation == 'connect' then
     authorization, can_operate = params, true
     result = { label = 'Test T3', canCreateThreads = true }
+  elseif operation == 'models' then
+    result = { runtimeMode = creation_ceiling }
   elseif operation == 'create' then
     result = { target = vim.tbl_extend('force', target, { thread_id = 'new', name = 'New review' }) }
   else
@@ -344,8 +347,16 @@ connection.request = function(operation, params, done)
   end
 end
 
+authorization = nil
 vim.cmd 'T3SelectThread'
 assert(t3.session.get(root).target.thread_id == 'new')
+assert(authorization == nil)
+
+-- A supervised connection must authorize full-access thread creation.
+creation_ceiling = 'approval-required'
+vim.cmd 'T3SelectThread'
+assert(authorization.access == 'operate' and authorization.runtime_mode == 'full-access')
+creation_ceiling = 'full-access'
 
 -- Sending retains comments on failure, deduplicates retries, and clears only unchanged submissions.
 choose, can_operate = nil, false

@@ -30,7 +30,7 @@ local function authorization_progress(event)
   instruction = instruction
     .. ' If asked, create a pairing code in T3 Settings → Connections, paste it, and click Approve.'
   if not operating then
-    instruction = instruction .. ' Then use <leader>rs to choose a review thread.'
+    instruction = instruction .. ' Then use :T3SelectThread to choose a review thread.'
   end
 
   notify(instruction)

@@ -117,33 +117,40 @@ function M.pick(opts, done)
       )
     end
 
-    if status.canCreateThreads then
-      launch()
-      return
-    end
-
-    vim.ui.select(
-      { 'Authorize thread creation', 'Cancel' },
-      { prompt = 'New threads need T3 operation access' },
-      function(choice)
-        if choice ~= 'Authorize thread creation' then
-          choose_thread(project, false)
-          return
-        end
-
-        Connection.connect({ force = true, access = 'operate' }, function(err, connected)
-          if err then
-            failed(err)
-          elseif not connected.canCreateThreads then
-            failed {
-              message = 'The grant is still read-only. Reconnect with thread-creation access; in browser mode, choose Supervised.',
-            }
-          else
-            launch()
-          end
-        end)
+    Connection.with_auth('models', { environment_id = project.environment_id }, function(err, capabilities)
+      if err then
+        failed(err)
+        return
       end
-    )
+
+      if status.canCreateThreads and capabilities.runtimeMode == 'full-access' then
+        launch()
+        return
+      end
+
+      vim.ui.select(
+        { 'Authorize thread creation', 'Cancel' },
+        { prompt = 'New threads need Full access operation access' },
+        function(choice)
+          if choice ~= 'Authorize thread creation' then
+            choose_thread(project, false)
+            return
+          end
+
+          Connection.connect({ force = true, access = 'operate', runtime_mode = 'full-access' }, function(err, connected)
+            if err then
+              failed(err)
+            elseif not connected.canCreateThreads then
+              failed {
+                message = 'The grant is still read-only. Reconnect with Full access; in browser mode, choose Full access.',
+              }
+            else
+              launch()
+            end
+          end)
+        end
+      )
+    end)
   end
 
   choose_thread = function(project, settled)

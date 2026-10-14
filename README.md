@@ -174,7 +174,7 @@ Leave `origin`, `runtime_file`, and `cli_path` unset for automatic discovery. Se
 
 By default, the plugin connects through T3's app-managed CLI, normally `~/.t3/bin/t3`. If the CLI is unavailable, it opens your default browser. Approve **Read only**; if asked for a pairing code, create one in **T3 Settings → Connections**.
 
-Reading projects and threads uses read-only access. Creating a thread requests **Supervised** operation access. Sending requests operation access matching the destination thread's runtime mode. The plugin prompts when additional access is needed.
+Reading projects and threads uses read-only access. Creating a thread requests **Full access** operation access. Sending requests operation access matching the destination thread's runtime mode. The plugin prompts when additional access is needed.
 
 Use `:T3Connect!` to reconnect or `:T3Connect! browser` to force browser authorization. Run `:T3Doctor` to check the detected server, CLI, and connection status.
 

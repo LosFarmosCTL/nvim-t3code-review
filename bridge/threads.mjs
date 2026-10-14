@@ -162,7 +162,7 @@ export async function createThread(
   if (!api.credentials.operates()) {
     fail(
       "OPERATION_ACCESS_REQUIRED",
-      "Creating a thread needs operation access. Reconnect and choose Approval required or broader in T3.",
+      "Creating a thread needs Full access operation access.",
     );
   }
 
@@ -195,7 +195,7 @@ export async function createThread(
     projectId: project_id,
     title,
     modelSelection: selection,
-    runtimeMode: "approval-required",
+    runtimeMode: "full-access",
     interactionMode: "default",
     workspaceStrategy: strategy,
   };
