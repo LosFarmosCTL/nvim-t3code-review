@@ -138,8 +138,8 @@ wait(function()
   return #trouble.get_items 't3_review' == 1
 end)
 
-vim.cmd 'T3ReviewStart'
-t3.start_review()
+vim.cmd 'T3ReviewList'
+t3.list_review()
 assert(#require('trouble.view').get { mode = 't3_review' } == 1)
 
 local item = t3.session.items(root)[1]

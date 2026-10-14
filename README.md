@@ -42,11 +42,10 @@ Add this spec to your plugin configuration. The mappings are suggestions; the pl
   build = 'npm ci --ignore-scripts --no-audit --no-fund',
   opts = {},
   cmd = {
-    'T3ReviewStart', 'T3ReviewAdd', 'T3ReviewList', 'T3ReviewDraft',
+    'T3ReviewAdd', 'T3ReviewList', 'T3ReviewDraft',
     'T3ReviewSend', 'T3ReviewClear', 'T3Review', 'T3Thread', 'T3Connect', 'T3Doctor',
   },
   keys = {
-    { '<leader>rs', '<cmd>T3ReviewStart<cr>', desc = 'Start/resume code review' },
     {
       '<leader>ra',
       function() require('t3code_review').add_review { visual = true } end,
@@ -72,12 +71,11 @@ With another package manager, the general steps to get everything to work proper
 ### Your first review
 
 1. Open T3 Code and register the project you want to review.
-2. Open a file from that checkout in Neovim and run `:T3ReviewStart`.
+2. Open a file from that checkout in Neovim, select some lines, and press `<leader>ra`, or run `:'<,'>T3ReviewAdd`.
 3. Choose the destination thread. On first use, the plugin connects to T3 automatically.
-4. Select some lines in Visual mode and press `<leader>ra`, or run `:'<,'>T3ReviewAdd`.
-5. Write your feedback in **Add review comment** and press **Ctrl-S** to add it to the review.
-6. Repeat for other parts of the code. Open `:T3ReviewList` to navigate or edit your comments.
-7. Press **s** in Code Review to open a draft in T3, or **S** to send directly.
+4. Write your feedback in **Add review comment** and press `<C-s>` to add it to the review. Code Review opens when you save the comment.
+5. Repeat for other parts of the code. Open `:T3ReviewList` to navigate or edit your comments.
+6. Press **s** in Code Review to open a draft in T3, or **S** to send directly.
 
 Save the files you've edited before handing off the review so the agent can read your changes from disk.
 
@@ -189,7 +187,6 @@ Connection credentials are stored separately under `stdpath('state')/t3/connecti
 
 | Command                              | Action                                                                 |
 | ------------------------------------ | ---------------------------------------------------------------------- |
-| `:T3ReviewStart`                     | Start or resume the current checkout's review                          |
 | `:T3ReviewAdd`                       | Add a comment on the whole file                                        |
 | `:21,32T3ReviewAdd`                  | Add a comment on a line range                                          |
 | `:T3ReviewList`                      | Open and focus Code Review                                             |
@@ -208,8 +205,7 @@ Like `T3ReviewAdd`, `T3Review` accepts a line range or a Visual selection.
 ```lua
 local review = require 't3code_review'
 
-review.start_review()                  -- Open/resume the review
-review.start_review { focus = true }   -- Focus its Trouble window
+review.list_review()                   -- Open and focus Code Review
 review.add_review { visual = true }    -- Comment on the active Visual selection
 review.add_review { first = 21, last = 32 }
 review.add_review()                    -- Comment on the whole file
@@ -221,7 +217,7 @@ review.clear_review()                  -- Clear comments, keep the recipient
 review.review { first = 21, last = 32 } -- Draft a single comment immediately
 ```
 
-`add_review()` and `review()` accept `bufnr` and an initial `comment`. Review operations such as `start_review()`, `stage_review()`, `send_review()`, and `clear_review()` accept a `root` to operate on a specific checkout.
+`add_review()` and `review()` accept `bufnr` and an initial `comment`. Review operations such as `list_review()`, `stage_review()`, `send_review()`, and `clear_review()` accept a `root` to operate on a specific checkout.
 
 For direct access to saved entries, use `review.session.get(root)` or `review.session.items(root)`. Edit an entry with `review.edit_review(id, { root = root })`. `review.draft(text, target)` opens arbitrary text as a draft; `target` contains `environment_id` and `thread_id`.
 

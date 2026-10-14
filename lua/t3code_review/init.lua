@@ -83,17 +83,13 @@ local function with_target(root, path, done)
   end
 end
 
-function M.start_review(opts)
+function M.list_review(opts)
   return run(function()
     opts = opts or {}
     local session = Session.get(opts.root)
 
-    if opts.target then
-      Session.set_target(session.root, opts.target)
-    end
-
     local path = vim.api.nvim_buf_get_name(0)
-    local view = review_window(session.root, opts.focus)
+    local view = review_window(session.root, true)
     if view and not Session.get(session.root).target then
       view:wait(function()
         M.review_thread { root = session.root, path = path }
@@ -264,10 +260,7 @@ function M.setup(opts)
   Session.setup(opts.review)
 
   for name, action in pairs {
-    T3ReviewStart = M.start_review,
-    T3ReviewList = function()
-      M.start_review { focus = true }
-    end,
+    T3ReviewList = M.list_review,
     T3Thread = M.review_thread,
     T3ReviewDraft = M.stage_review,
     T3Doctor = M.doctor,
