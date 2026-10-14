@@ -6,6 +6,8 @@ Select code, write a comment, and keep reviewing. Your comments appear in a navi
 
 The agent receives file links, line references, and your comments. It reads the code from your checkout itself.
 
+https://github.com/user-attachments/assets/5420ea42-c19b-4dc6-b85e-ef662ebc43f5
+
 ## ✨ Features
 
 - Comment on a visual selection, a specific line, or a whole file.
