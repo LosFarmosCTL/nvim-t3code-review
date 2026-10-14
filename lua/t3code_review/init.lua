@@ -26,7 +26,7 @@ local function review_window(root, focus)
   return require('trouble.sources.t3_review').open(root, { focus = focus })
 end
 
-function M.capture(opts)
+local function capture_reference(opts)
   opts = opts or {}
   local buf = opts.bufnr or vim.api.nvim_get_current_buf()
   local path = vim.api.nvim_buf_get_name(buf)
@@ -56,7 +56,7 @@ function M.capture(opts)
   }
 end
 
-function M.review_thread(opts, done)
+function M.select_thread(opts, done)
   opts = opts or {}
   local root = opts.root or Path.root()
   local saved = Session.get(root).target
@@ -79,11 +79,11 @@ local function with_target(root, path, done)
   if target then
     done(target)
   else
-    M.review_thread({ root = root, path = path }, done)
+    M.select_thread({ root = root, path = path }, done)
   end
 end
 
-function M.list_review(opts)
+function M.show_review(opts)
   return run(function()
     opts = opts or {}
     local session = Session.get(opts.root)
@@ -92,7 +92,7 @@ function M.list_review(opts)
     local view = review_window(session.root, true)
     if view and not Session.get(session.root).target then
       view:wait(function()
-        M.review_thread { root = session.root, path = path }
+        M.select_thread { root = session.root, path = path }
       end)
     end
 
@@ -110,7 +110,7 @@ local function comment(reference, text, action, save, title)
       return target and target.name or nil
     end,
     thread = function(updated)
-      M.review_thread({ root = reference.root }, updated)
+      M.select_thread({ root = reference.root }, updated)
     end,
     save = save,
   }
@@ -135,10 +135,10 @@ local function stage(text, target, root, done)
   end)
 end
 
-function M.add_review(opts)
+function M.add_comment(opts)
   return run(function()
     opts = opts or {}
-    local reference = M.capture(opts)
+    local reference = capture_reference(opts)
     with_target(reference.root, reference.path, function(target)
       if not target then
         return
@@ -153,7 +153,7 @@ function M.add_review(opts)
   end)
 end
 
-function M.edit_review(id, opts)
+function M.edit_comment(id, opts)
   return run(function()
     for _, item in ipairs(Session.items(opts and opts.root)) do
       if item.id == id then
@@ -169,7 +169,7 @@ function M.edit_review(id, opts)
   end)
 end
 
-function M.stage_review(opts)
+function M.draft_review(opts)
   return run(function()
     opts = opts or {}
     local root = opts.root or Path.root()
@@ -233,15 +233,46 @@ function M.send_review(opts)
   end)
 end
 
-function M.review(opts)
+function M.draft_comment(opts)
   return run(function()
     opts = opts or {}
-    local reference = M.capture(opts)
+    local reference = capture_reference(opts)
 
     with_target(reference.root, reference.path, function(target)
       if target then
         comment(reference, opts.comment, 'stage draft', function(text, done)
           stage(Session.format_reference(reference, text), Session.get(reference.root).target, reference.root, done)
+        end)
+      end
+    end)
+  end)
+end
+
+function M.send_comment(opts)
+  return run(function()
+    opts = opts or {}
+    local reference = capture_reference(opts)
+    -- Keep retries stable within this popup, but allow identical comments in separate sends.
+    local submitted = { { id = 'comment:' .. tostring(vim.uv.hrtime()) } }
+
+    with_target(reference.root, reference.path, function(target)
+      if target then
+        comment(reference, opts.comment, 'send comment', function(text, done)
+          Delivery.send(
+            reference.root,
+            Session.get(reference.root).target,
+            Session.format_reference(reference, text),
+            submitted,
+            function(err, receipt)
+              done(err and err.message or not receipt and 'Comment was not sent' or nil)
+              if receipt then
+                notify('Comment sent (' .. receipt.delivery .. ')')
+              end
+              if opts.done then
+                opts.done(err, receipt)
+              end
+            end
+          )
         end)
       end
     end)
@@ -260,19 +291,23 @@ function M.setup(opts)
   Session.setup(opts.review)
 
   for name, action in pairs {
-    T3ReviewList = M.list_review,
-    T3Thread = M.review_thread,
-    T3ReviewDraft = M.stage_review,
+    T3ShowReview = M.show_review,
+    T3SelectThread = M.select_thread,
+    T3DraftReview = M.draft_review,
     T3Doctor = M.doctor,
-    T3ReviewClear = M.clear_review,
-    T3ReviewSend = M.send_review,
+    T3ClearReview = M.clear_review,
+    T3SendReview = M.send_review,
   } do
     vim.api.nvim_create_user_command(name, function()
       action()
     end, {})
   end
 
-  for name, action in pairs { T3Review = M.review, T3ReviewAdd = M.add_review } do
+  for name, action in pairs {
+    T3DraftComment = M.draft_comment,
+    T3SendComment = M.send_comment,
+    T3AddComment = M.add_comment,
+  } do
     vim.api.nvim_create_user_command(name, function(args)
       action { first = args.range > 0 and args.line1 or nil, last = args.range > 0 and args.line2 or nil }
     end, { range = true })

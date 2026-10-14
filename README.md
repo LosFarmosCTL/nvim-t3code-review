@@ -42,23 +42,24 @@ Add this spec to your plugin configuration. The mappings are suggestions; the pl
   build = 'npm ci --ignore-scripts --no-audit --no-fund',
   opts = {},
   cmd = {
-    'T3ReviewAdd', 'T3ReviewList', 'T3ReviewDraft',
-    'T3ReviewSend', 'T3ReviewClear', 'T3Review', 'T3Thread', 'T3Connect', 'T3Doctor',
+    'T3AddComment', 'T3ShowReview', 'T3DraftReview',
+    'T3SendReview', 'T3ClearReview', 'T3DraftComment', 'T3SendComment',
+    'T3SelectThread', 'T3Connect', 'T3Doctor',
   },
   keys = {
     {
       '<leader>ra',
-      function() require('t3code_review').add_review { visual = true } end,
+      function() require('t3code_review').add_comment { visual = true } end,
       mode = 'x',
       desc = 'Add review comment to selection',
     },
-    { '<leader>ra', '<cmd>.T3ReviewAdd<cr>', desc = 'Add review comment to current line' },
-    { '<leader>rf', '<cmd>T3ReviewAdd<cr>', desc = 'Add review comment to file' },
-    { '<leader>rr', '<cmd>T3ReviewList<cr>', desc = 'Show code review' },
-    { '<leader>rt', '<cmd>T3Thread<cr>', desc = 'Switch review thread' },
-    { '<leader>rd', '<cmd>T3ReviewDraft<cr>', desc = 'Stage review draft' },
-    { '<leader>rS', '<cmd>T3ReviewSend<cr>', desc = 'Send review' },
-    { '<leader>rx', '<cmd>T3ReviewClear<cr>', desc = 'Clear review comments' },
+    { '<leader>ra', '<cmd>.T3AddComment<cr>', desc = 'Add review comment to current line' },
+    { '<leader>rf', '<cmd>T3AddComment<cr>', desc = 'Add review comment to file' },
+    { '<leader>rr', '<cmd>T3ShowReview<cr>', desc = 'Show code review' },
+    { '<leader>rt', '<cmd>T3SelectThread<cr>', desc = 'Switch review thread' },
+    { '<leader>rd', '<cmd>T3DraftReview<cr>', desc = 'Stage review draft' },
+    { '<leader>rS', '<cmd>T3SendReview<cr>', desc = 'Send review' },
+    { '<leader>rx', '<cmd>T3ClearReview<cr>', desc = 'Clear review comments' },
     { '<leader>rc', '<cmd>T3Connect<cr>', desc = 'Connect to T3 Code' },
   },
 }
@@ -71,10 +72,10 @@ With another package manager, the general steps to get everything to work proper
 ### Your first review
 
 1. Open T3 Code and register the project you want to review.
-2. Open a file from that checkout in Neovim, select some lines, and press `<leader>ra`, or run `:'<,'>T3ReviewAdd`.
+2. Open a file from that checkout in Neovim, select some lines, and press `<leader>ra`, or run `:'<,'>T3AddComment`.
 3. Choose the destination thread. On first use, the plugin connects to T3 automatically.
 4. Write your feedback in **Add review comment** and press `<C-s>` to add it to the review. Code Review opens when you save the comment.
-5. Repeat for other parts of the code. Open `:T3ReviewList` to navigate or edit your comments.
+5. Repeat for other parts of the code. Open `:T3ShowReview` to navigate or edit your comments.
 6. Press **s** in Code Review to open a draft in T3, or **S** to send directly.
 
 Save the files you've edited before handing off the review so the agent can read your changes from disk.
@@ -83,13 +84,13 @@ Save the files you've edited before handing off the review so the agent can read
 
 The popup title shows the selected thread.
 
-| Key                | Action                                  |
-| ------------------ | --------------------------------------- |
-| `Ctrl-S`           | Add the comment, or save an edit        |
-| `Ctrl-T`           | Switch thread while keeping the comment |
-| `Ctrl-C`           | Cancel                                  |
-| `q` in Normal mode | Cancel                                  |
-| `Esc` in Normal mode | Cancel                                |
+| Key                  | Action                                  |
+| -------------------- | --------------------------------------- |
+| `Ctrl-S`             | Add the comment, or save an edit        |
+| `Ctrl-T`             | Switch thread while keeping the comment |
+| `Ctrl-C`             | Cancel                                  |
+| `q` in Normal mode   | Cancel                                  |
+| `Esc` in Normal mode | Cancel                                  |
 
 ### Code Review window
 
@@ -111,7 +112,7 @@ Trouble's usual navigation, preview, and folding controls remain available. The 
 
 The picker prioritizes projects matching the selected file or checkout, including related Git worktrees. Threads in the same checkout appear first. You can also browse settled threads, choose another project, or create a new review thread.
 
-Your chosen thread is saved per checkout. Use `:T3Thread`, **t** in Code Review, or **Ctrl-T** in the comment popup to change it.
+Your chosen thread is saved per checkout. Use `:T3SelectThread`, **t** in Code Review, or **Ctrl-T** in the comment popup to change it.
 
 A new thread uses the current checkout and the project's default model, or asks you to choose a model. It starts idle; adding comments does not start an agent run.
 
@@ -124,7 +125,7 @@ A new thread uses the current checkout and the project's default model, or asks 
 | Local comments   | Kept until you remove or clear them | Cleared after confirmed delivery             |
 | Message limit    | 8,000 UTF-16 units                  | 120,000 characters                           |
 
-Sending a staged draft from T3 does **not** clear the local review. Use `:T3ReviewClear` or **C** when you're done. Clearing comments keeps the selected thread.
+Sending a staged draft from T3 does **not** clear the local review. Use `:T3ClearReview` or **C** when you're done. Clearing comments keeps the selected thread.
 
 ### What the agent receives
 
@@ -185,47 +186,49 @@ Connection credentials are stored separately under `stdpath('state')/t3/connecti
 
 ## Commands
 
-| Command                              | Action                                                                 |
-| ------------------------------------ | ---------------------------------------------------------------------- |
-| `:T3ReviewAdd`                       | Add a comment on the whole file                                        |
-| `:21,32T3ReviewAdd`                  | Add a comment on a line range                                          |
-| `:T3ReviewList`                      | Open and focus Code Review                                             |
-| `:T3ReviewDraft`                     | Stage all comments in T3's composer                                    |
-| `:T3ReviewSend`                      | Send all comments directly                                             |
-| `:T3ReviewClear`                     | Clear comments, keeping the selected thread                            |
-| `:T3Review`                          | Write a comment and draft it without adding it to the collected review |
-| `:T3Thread`                          | Choose another thread                                                  |
-| `:T3Connect[!] [auto\|cli\|browser]` | Connect, or force a new connection with `!`                            |
-| `:T3Doctor`                          | Show connection details                                                |
+| Command                             | Action                                                               |
+| ----------------------------------- | -------------------------------------------------------------------- |
+| `:T3AddComment`                      | Add a comment on the whole file                                      |
+| `:21,32T3AddComment`                 | Add a comment on a line range                                        |
+| `:T3ShowReview`                      | Open and focus Code Review                                           |
+| `:T3DraftReview`                     | Stage all comments in T3's composer                                   |
+| `:T3SendReview`                      | Send all comments directly                                           |
+| `:T3ClearReview`                     | Clear comments, keeping the selected thread                          |
+| `:T3DraftComment`                    | Write and draft one comment, keeping the collected review unchanged   |
+| `:T3SendComment`                     | Write and send one comment, keeping the collected review unchanged    |
+| `:T3SelectThread`                    | Choose another thread                                                |
+| `:T3Connect[!] [auto\|cli\|browser]` | Connect, or force a new connection with `!`                           |
+| `:T3Doctor`                         | Show connection details                                              |
 
-Like `T3ReviewAdd`, `T3Review` accepts a line range or a Visual selection.
+Like `T3AddComment`, `T3DraftComment` and `T3SendComment` accept a line range or a Visual selection. Without a range, they reference the whole file. A failed or canceled direct send keeps the comment popup open so you can retry.
 
 ## Lua API
 
 ```lua
 local review = require 't3code_review'
 
-review.list_review()                   -- Open and focus Code Review
-review.add_review { visual = true }    -- Comment on the active Visual selection
-review.add_review { first = 21, last = 32 }
-review.add_review()                    -- Comment on the whole file
-review.review_thread()                 -- Choose a recipient
-review.stage_review()                  -- Draft the collected comments
+review.show_review()                   -- Open and focus Code Review
+review.add_comment { visual = true }   -- Comment on the active Visual selection
+review.add_comment { first = 21, last = 32 }
+review.add_comment()                   -- Comment on the whole file
+review.select_thread()                 -- Choose the thread used for the review
+review.draft_review()                  -- Draft the collected comments
 review.send_review()                   -- Send the collected comments
-review.clear_review()                  -- Clear comments, keep the recipient
+review.clear_review()                  -- Clear all comments
 
-review.review { first = 21, last = 32 } -- Draft a single comment immediately
+review.draft_comment { first = 21, last = 32 } -- Draft a single comment immediately
+review.send_comment { first = 21, last = 32 }  -- Send a single comment directly
 ```
 
-`add_review()` and `review()` accept `bufnr` and an initial `comment`. Review operations such as `list_review()`, `stage_review()`, `send_review()`, and `clear_review()` accept a `root` to operate on a specific checkout.
+`add_comment()`, `draft_comment()`, and `send_comment()` accept `bufnr` and an initial `comment`. Review operations such as `show_review()`, `draft_review()`, `send_review()`, and `clear_review()` accept a `root` to operate on a specific checkout. Both send operations accept `done(err, receipt)`, called when a send attempt completes; canceling authorization returns no error and no receipt.
 
-For direct access to saved entries, use `review.session.get(root)` or `review.session.items(root)`. Edit an entry with `review.edit_review(id, { root = root })`. `review.draft(text, target)` opens arbitrary text as a draft; `target` contains `environment_id` and `thread_id`.
+For direct access to saved entries, use `review.session.get(root)` or `review.session.items(root)`. Edit an entry with `review.edit_comment(id, { root = root })`. `review.draft(text, target)` opens arbitrary text as a draft; `target` contains `environment_id` and `thread_id`.
 
 ## Troubleshooting
 
 - **Can't connect?** Open T3 Code, run `:T3Doctor`, and check that your installed version supports Orchestrator V2 (as of writing this README this requires the nighly version of T3 Code). Use `:T3Connect!` to replace an expired or revoked grant.
 - **The bridge won't start?** Check that Neovim can run Node.js 22+, and run `npm ci --ignore-scripts` in the plugin directory.
-- **No matching project?** Register the checkout in T3 Code, then run `:T3Thread` again.
+- **No matching project?** Register the checkout in T3 Code, then run `:T3SelectThread` again.
 - **Draft too long?** Shorten the comments or use direct sending, which has a larger message limit.
 - **Thread creation wasn't confirmed?** Check T3's thread list before trying again; the thread may already exist.
 

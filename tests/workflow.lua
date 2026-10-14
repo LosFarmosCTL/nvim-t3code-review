@@ -77,7 +77,7 @@ local function wait(fn)
   assert(vim.wait(3000, fn, 10), 'Workflow timed out')
 end
 
-local function save_comment(text)
+local function save_comment(text, complete)
   wait(function()
     return vim.bo.filetype == 'markdown'
   end)
@@ -92,6 +92,9 @@ local function save_comment(text)
   for _, key in ipairs(vim.api.nvim_buf_get_keymap(popup, 'n')) do
     if key.lhs == '<C-S>' then
       key.callback()
+      if complete then
+        complete()
+      end
       wait(function()
         return vim.api.nvim_get_current_buf() ~= popup
       end)
@@ -106,7 +109,7 @@ end
 vim.api.nvim_set_current_win(window)
 vim.api.nvim_win_set_cursor(0, { 2, 0 })
 vim.cmd.normal { args = { 'Vj' }, bang = true }
-t3.add_review { visual = true }
+t3.add_comment { visual = true }
 wait(function()
   return vim.bo.filetype == 'markdown'
 end)
@@ -138,8 +141,8 @@ wait(function()
   return #trouble.get_items 't3_review' == 1
 end)
 
-vim.cmd 'T3ReviewList'
-t3.list_review()
+vim.cmd 'T3ShowReview'
+t3.show_review()
 assert(#require('trouble.view').get { mode = 't3_review' } == 1)
 
 local item = t3.session.items(root)[1]
@@ -148,10 +151,10 @@ assert(item.reference.first == 2 and item.reference.last == 3 and item.reference
 vim.api.nvim_buf_set_lines(source, 0, 0, false, { 'new header' })
 assert(t3.session.location(root, item.id).pos[1] == 3)
 
-t3.edit_review(item.id, { root = root })
+t3.edit_comment(item.id, { root = root })
 save_comment 'Keep retry ownership in the service'
 
-vim.cmd 'T3ReviewDraft'
+vim.cmd 'T3DraftReview'
 
 local prompt = handed_off:match('prompt=(.*)'):gsub('%%(%x%x)', function(hex)
   return string.char(tonumber(hex, 16))
@@ -249,13 +252,70 @@ vim.api.nvim_win_set_buf(window, source)
 t3.session.remove(root, preview_id)
 
 handed_off = nil
-t3.review { first = 2, last = 2 }
+t3.draft_comment { first = 2, last = 2 }
 save_comment 'Immediate feedback'
 assert(handed_off and #t3.session.items(root) == 1)
 
+-- Direct comments preserve the collected review and stay editable after failed delivery.
+vim.cmd '2T3SendComment'
+local direct_popup = vim.api.nvim_get_current_buf()
+vim.api.nvim_buf_set_lines(direct_popup, 0, -1, false, { 'Immediate send' })
+local submit
+for _, key in ipairs(vim.api.nvim_buf_get_keymap(direct_popup, 'n')) do
+  if key.lhs == '<C-S>' then
+    submit = key.callback
+  end
+end
+assert(submit)
+submit()
+local direct_request_id, pending = send_params.request_id, delivery
+assert(send_params.text == '[service.lua](service.lua:2)\nImmediate send')
+submit()
+assert(delivery == pending)
+delivery { message = 'Comment delivery unavailable' }
+assert(vim.api.nvim_get_current_buf() == direct_popup)
+assert(vim.api.nvim_buf_get_lines(direct_popup, 0, -1, false)[1] == 'Immediate send')
+save_comment('Immediate send', function()
+  assert(send_params.request_id == direct_request_id)
+  delivery(nil, { delivery = 'queued' })
+end)
+assert(#t3.session.items(root) == 1 and t3.session.items(root)[1].id == item.id)
+
+-- Separate popups can send identical feedback as separate messages.
+local completed
+t3.send_comment { first = 2, last = 2, comment = 'Immediate send', done = function(err, receipt)
+  assert(not err)
+  completed = receipt
+end }
+save_comment('Immediate send', function()
+  assert(send_params.request_id ~= direct_request_id)
+  delivery(nil, { delivery = 'started' })
+end)
+assert(completed.delivery == 'started' and #t3.session.items(root) == 1)
+
+-- Canceling authorization keeps the popup and does not dispatch a message.
+can_operate = false
+choose = function(items)
+  return items[2]
+end
+t3.send_comment { first = 2, last = 2 }
+local canceled_popup, previous_delivery = vim.api.nvim_get_current_buf(), delivery
+vim.api.nvim_buf_set_lines(canceled_popup, 0, -1, false, { 'Send after authorization' })
+for _, key in ipairs(vim.api.nvim_buf_get_keymap(canceled_popup, 'n')) do
+  if key.lhs == '<C-S>' then
+    key.callback()
+  end
+end
+assert(vim.api.nvim_get_current_buf() == canceled_popup and delivery == previous_delivery)
+choose, can_operate = nil, true
+save_comment('Send after authorization', function()
+  delivery(nil, { delivery = 'queued' })
+end)
+assert(#t3.session.items(root) == 1)
+
 -- A failed handoff keeps the review; choosing a new thread changes its recipient.
 handed_off, failure = nil, 'Thread unavailable'
-t3.stage_review { root = root }
+t3.draft_review { root = root }
 assert(handed_off == nil and #t3.session.items(root) == 1)
 
 failure = nil
@@ -284,7 +344,7 @@ connection.request = function(operation, params, done)
   end
 end
 
-vim.cmd 'T3Thread'
+vim.cmd 'T3SelectThread'
 assert(t3.session.get(root).target.thread_id == 'new')
 
 -- Sending retains comments on failure, deduplicates retries, and clears only unchanged submissions.

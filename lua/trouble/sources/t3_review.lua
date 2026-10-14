@@ -84,7 +84,7 @@ M.config = {
           desc = 'Edit review comment',
           action = function(view, ctx)
             if ctx.item then
-              require('t3code_review').edit_review(ctx.item.item.review_id, { root = root(view) })
+              require('t3code_review').edit_comment(ctx.item.item.review_id, { root = root(view) })
             end
           end,
         },
@@ -99,7 +99,7 @@ M.config = {
         s = {
           desc = 'Stage review as draft',
           action = function(view)
-            require('t3code_review').stage_review { root = root(view) }
+            require('t3code_review').draft_review { root = root(view) }
           end,
         },
         S = {
@@ -117,7 +117,7 @@ M.config = {
         t = {
           desc = 'Switch thread',
           action = function(view)
-            require('t3code_review').review_thread { root = root(view) }
+            require('t3code_review').select_thread { root = root(view) }
           end,
         },
       },
