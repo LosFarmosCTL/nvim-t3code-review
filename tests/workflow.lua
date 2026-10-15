@@ -380,6 +380,7 @@ t3.send_review { root = root }
 local new_id = t3.session.add({ path = preview_path, root = root, first = 1, last = 1 }, 'Added while sending')
 delivery(nil, { delivery = 'started' })
 assert(#t3.session.items(root) == 1 and t3.session.items(root)[1].id == new_id)
+assert(t3.session.undo(root) == 0)
 
 t3.clear_review { root = root }
 assert(#t3.session.items(root) == 0)
@@ -395,6 +396,80 @@ assert(
       .. '[service.lua](service.lua:3-4)\nAnother comment\n\n---\n'
       .. '[other.lua](other.lua)\nWhole file comment'
 )
+
+-- Additions and edits share the review history; code-buffer undo stays separate.
+local history_root = temp .. '/history'
+vim.fn.mkdir(history_root .. '/.git', 'p')
+local history_buf = vim.api.nvim_create_buf(true, false)
+vim.api.nvim_buf_set_name(history_buf, history_root .. '/file.lua')
+vim.api.nvim_buf_set_lines(history_buf, 0, -1, false, { 'first', 'second', 'third' })
+local reference = { root = history_root, path = history_root .. '/file.lua', first = 2, last = 2, bufnr = history_buf }
+assert(t3.session.undo(history_root) == 0 and t3.session.redo(history_root) == 0)
+local first = t3.session.add(reference, 'First')
+assert(t3.session.undo(history_root) == 1 and #t3.session.items(history_root) == 0)
+vim.api.nvim_buf_set_lines(history_buf, 0, 0, false, { 'inserted while undone' })
+assert(t3.session.redo(history_root) == 1 and t3.session.items(history_root)[1].id == first)
+assert(t3.session.location(history_root, first).pos[1] == 3)
+local second = t3.session.add(reference, 'Second')
+t3.session.set_target(history_root, target)
+t3.session.edit(history_root, second, 'Second edited')
+t3.session.edit(history_root, second, 'Second edited')
+assert(t3.session.undo(history_root) == 1 and t3.session.items(history_root)[2].comment == 'Second')
+assert(t3.session.redo(history_root) == 1 and t3.session.items(history_root)[2].comment == 'Second edited')
+
+-- Deleted comments retain their order and keep following source edits.
+t3.session.remove(history_root, first)
+vim.api.nvim_buf_set_lines(history_buf, 0, 0, false, { 'inserted while deleted' })
+local actions = require('trouble.sources.t3_review').config.modes.t3_review.keys
+local history_view = { opts = { params = { root = history_root } } }
+actions.u.action(history_view)
+assert(t3.session.items(history_root)[1].id == first and t3.session.items(history_root)[2].id == second)
+assert(t3.session.location(history_root, first).pos[1] == 4)
+actions['<C-r>'].action(history_view)
+assert(#t3.session.items(history_root) == 1 and t3.session.items(history_root)[1].id == second)
+actions.u.action(history_view)
+
+-- Clear and add are separate steps that undo and redo in chronological order.
+assert(t3.session.clear(history_root) == 2)
+assert(t3.session.clear(history_root) == 0)
+assert(t3.session.undo(history_root) == 2)
+assert(t3.session.get(history_root).target.thread_id == target.thread_id)
+assert(t3.session.redo(history_root) == 2 and #t3.session.items(history_root) == 0)
+local third = t3.session.add(reference, 'Third')
+assert(t3.session.undo(history_root) == 1 and #t3.session.items(history_root) == 0)
+assert(t3.session.undo(history_root) == 2)
+local restored = t3.session.items(history_root)
+assert(restored[1].id == first and restored[2].id == second)
+assert(t3.session.redo(history_root) == 2 and #t3.session.items(history_root) == 0)
+assert(t3.session.redo(history_root) == 1 and t3.session.items(history_root)[1].id == third)
+
+-- Adding or editing after undo replaces the redo branch; histories are per checkout.
+t3.session.undo(history_root)
+local fourth = t3.session.add(reference, 'Fourth')
+assert(t3.session.redo(history_root) == 0)
+t3.session.edit(history_root, fourth, 'Fourth edited')
+t3.session.undo(history_root)
+t3.session.edit(history_root, fourth, 'Fourth replacement')
+assert(t3.session.redo(history_root) == 0)
+assert(t3.session.undo(history_root) == 1 and t3.session.items(history_root)[1].comment == 'Fourth')
+assert(t3.session.redo(history_root) == 1 and t3.session.items(history_root)[1].comment == 'Fourth replacement')
+assert(t3.session.undo(root) == 1)
+assert(#t3.session.items(history_root) == 1)
+assert(t3.session.redo(root) == 1)
+
+-- Restored state is persisted, but undo history is session-local.
+local reloaded = dofile 'lua/t3code_review/session.lua'
+reloaded.setup { storage_dir = temp .. '/state' }
+assert(reloaded.items(history_root)[1].comment == 'Fourth replacement')
+assert(reloaded.undo(history_root) == 0)
+
+-- Confirmed delivery discards both stacks, even when every comment changed during delivery.
+local submitted = t3.session.items(history_root)
+t3.session.edit(history_root, fourth, 'Changed during delivery')
+t3.session.clear(history_root, submitted)
+assert(t3.session.undo(history_root) == 0 and t3.session.redo(history_root) == 0)
+assert(#t3.session.items(history_root) == 1 and t3.session.items(history_root)[1].id == fourth)
+vim.api.nvim_buf_delete(history_buf, { force = true })
 
 trouble.close 't3_review'
 vim.fn.delete(temp, 'rf')

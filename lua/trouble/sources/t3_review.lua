@@ -96,6 +96,18 @@ M.config = {
             end
           end,
         },
+        u = {
+          desc = 'Undo review change',
+          action = function(view)
+            require('t3code_review.session').undo(root(view))
+          end,
+        },
+        ['<C-r>'] = {
+          desc = 'Redo review change',
+          action = function(view)
+            require('t3code_review.session').redo(root(view))
+          end,
+        },
         s = {
           desc = 'Stage review as draft',
           action = function(view)

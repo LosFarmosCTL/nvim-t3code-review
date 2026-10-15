@@ -100,6 +100,8 @@ Comments are grouped by file. Move through them to preview their locations using
 | ---- | --------------------------- |
 | `e`  | Edit the selected comment   |
 | `dd` | Remove the selected comment |
+| `u` | Undo the last review change |
+| `<C-r>` | Redo the last review change |
 | `s`  | Stage the review as a draft |
 | `S`  | Send the review directly    |
 | `C`  | Clear all comments          |
@@ -107,6 +109,8 @@ Comments are grouped by file. Move through them to preview their locations using
 | `?`  | Show shortcut help          |
 
 Trouble's usual navigation, preview, and folding controls remain available. The review view inherits your diagnostics-mode configuration.
+
+Undo and redo cover adding, editing, deleting, and clearing comments, per checkout for the current Neovim session. Clearing all comments is one undo step; sending a review resets the history.
 
 ### Choosing a thread
 

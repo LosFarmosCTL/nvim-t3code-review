@@ -2,6 +2,7 @@ local Path = require 't3code_review.path'
 local M = {}
 
 local sessions, anchors = {}, {}
+local history = {}
 local storage = vim.fn.stdpath 'state' .. '/t3/reviews'
 local ns = vim.api.nvim_create_namespace 't3.review.locations'
 local counter = 0
@@ -26,7 +27,7 @@ function M.get(root)
     end
 
     assert(session.root == root and type(session.items) == 'table', 'Invalid code review: ' .. file)
-    sessions[root], anchors[root] = session, {}
+    sessions[root], anchors[root], history[root] = session, {}, { undo = {}, redo = {} }
   end
 
   return vim.deepcopy(sessions[root])
@@ -79,9 +80,42 @@ local function attach(root, item, buf)
   }
 end
 
+local function prune_anchors(root)
+  local retained = {}
+  for _, item in ipairs(sessions[root].items) do
+    retained[item.id] = true
+  end
+  for _, stack in pairs(history[root]) do
+    for _, change in ipairs(stack) do
+      for _, items in ipairs { change.before, change.after } do
+        for _, item in ipairs(items) do
+          retained[item.id] = true
+        end
+      end
+    end
+  end
+  for id, anchor in pairs(anchors[root]) do
+    if not retained[id] then
+      if vim.api.nvim_buf_is_valid(anchor.buf) then
+        vim.api.nvim_buf_del_extmark(anchor.buf, ns, anchor.first)
+        vim.api.nvim_buf_del_extmark(anchor.buf, ns, anchor.last)
+      end
+      anchors[root][id] = nil
+    end
+  end
+end
+
+local function record(session, before, count)
+  local changes = history[session.root]
+  changes.undo[#changes.undo + 1] = { before = before, after = vim.deepcopy(session.items), count = count }
+  changes.redo = {}
+  prune_anchors(session.root)
+end
+
 function M.add(reference, comment)
   assert(comment:match '%S', 'Add a review comment first')
   local session = M.get(reference.root)
+  local before = vim.deepcopy(session.items)
   counter = counter + 1
   local item = {
     id = tostring(vim.uv.hrtime()) .. ':' .. counter,
@@ -97,6 +131,7 @@ function M.add(reference, comment)
 
   session.items[#session.items + 1] = item
   save(session)
+  record(session, before, 1)
   attach(session.root, item, reference.bufnr)
   return item.id
 end
@@ -104,11 +139,16 @@ end
 function M.edit(root, id, comment)
   assert(comment:match '%S', 'Add a review comment first')
   local session = M.get(root)
+  local before = vim.deepcopy(session.items)
 
   for _, item in ipairs(session.items) do
     if item.id == id then
+      if item.comment == comment then
+        return
+      end
       item.comment = comment
       save(session)
+      record(session, before, 1)
       return
     end
   end
@@ -116,16 +156,7 @@ function M.edit(root, id, comment)
   error 'Review comment no longer exists'
 end
 
-function M.remove(root, id)
-  for _, item in ipairs(M.items(root)) do
-    if item.id == id then
-      return M.clear(root, { item })
-    end
-  end
-end
-
--- A send clears only the submitted entries that have not been edited in the meantime.
-function M.clear(root, submitted)
+local function clear(root, submitted, remember)
   local session = M.get(root)
   local sent, keep, removed = {}, {}, {}
   for _, item in ipairs(submitted or {}) do
@@ -134,25 +165,60 @@ function M.clear(root, submitted)
 
   for _, item in ipairs(session.items) do
     if not submitted or vim.deep_equal(sent[item.id], item) then
-      removed[#removed + 1] = item.id
+      removed[#removed + 1] = item
     else
       keep[#keep + 1] = item
     end
   end
 
-  session.items = keep
-  save(session)
-
-  for _, id in ipairs(removed) do
-    local anchor = anchors[session.root][id]
-    if anchor and vim.api.nvim_buf_is_valid(anchor.buf) then
-      vim.api.nvim_buf_del_extmark(anchor.buf, ns, anchor.first)
-      vim.api.nvim_buf_del_extmark(anchor.buf, ns, anchor.last)
-    end
-    anchors[session.root][id] = nil
+  local before = session.items
+  if #removed > 0 then
+    session.items = keep
+    save(session)
   end
+  if not remember then
+    history[session.root] = { undo = {}, redo = {} }
+  elseif #removed > 0 then
+    record(session, before, #removed)
+  end
+  prune_anchors(session.root)
 
   return #removed
+end
+
+function M.remove(root, id)
+  for _, item in ipairs(M.items(root)) do
+    if item.id == id then
+      return clear(root, { item }, true)
+    end
+  end
+end
+
+-- A send clears only unchanged submitted entries and cannot be undone.
+function M.clear(root, submitted)
+  return clear(root, submitted, submitted == nil)
+end
+
+local function restore(root, direction, opposite, state)
+  local session = M.get(root)
+  local changes = history[session.root]
+  local change = changes[direction][#changes[direction]]
+  if not change then
+    return 0
+  end
+  session.items = vim.deepcopy(change[state])
+  save(session)
+  table.remove(changes[direction])
+  changes[opposite][#changes[opposite] + 1] = change
+  return change.count
+end
+
+function M.undo(root)
+  return restore(root, 'undo', 'redo', 'before')
+end
+
+function M.redo(root)
+  return restore(root, 'redo', 'undo', 'after')
 end
 
 function M.location(root, id)
