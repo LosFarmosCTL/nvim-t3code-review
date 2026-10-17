@@ -184,7 +184,7 @@ Use `:T3Connect!` to reconnect or `:T3Connect! browser` to force browser authori
 
 ### Saved reviews
 
-Reviews are stored as JSON under `stdpath('state')/t3/reviews`, one file per canonical checkout path. Each review contains comments, file/line references, and its selected thread. Line references follow buffer edits during the current Neovim session.
+Reviews are stored as JSON under `stdpath('state')/t3/reviews`, one file per canonical checkout path. Each review contains comments, file/line references, and its selected thread. Line references follow buffer edits and their updated positions are saved when you write the source file.
 
 Connection credentials are stored separately under `stdpath('state')/t3/connections` in private files.
 

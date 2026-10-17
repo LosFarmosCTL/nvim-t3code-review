@@ -6,6 +6,7 @@ local history = {}
 local storage = vim.fn.stdpath 'state' .. '/t3/reviews'
 local ns = vim.api.nvim_create_namespace 't3.review.locations'
 local counter = 0
+local persist_positions
 
 local function storage_file(root)
   return storage .. '/' .. vim.fn.sha256(root) .. '.json'
@@ -15,6 +16,12 @@ function M.setup(opts)
   if opts and opts.storage_dir then
     storage = opts.storage_dir
   end
+  vim.api.nvim_create_autocmd('BufWritePost', {
+    group = vim.api.nvim_create_augroup('T3ReviewPositions', { clear = true }),
+    callback = function(event)
+      persist_positions(event.buf)
+    end,
+  })
 end
 
 function M.get(root)
@@ -78,6 +85,57 @@ local function attach(root, item, buf)
     first = vim.api.nvim_buf_set_extmark(buf, ns, math.min(item.reference.first, count) - 1, 0, {}),
     last = vim.api.nvim_buf_set_extmark(buf, ns, math.min(item.reference.last, count) - 1, 0, {}),
   }
+end
+
+local function anchor_position(anchor)
+  if anchor and vim.api.nvim_buf_is_loaded(anchor.buf) then
+    local first = vim.api.nvim_buf_get_extmark_by_id(anchor.buf, ns, anchor.first, {})
+    local last = vim.api.nvim_buf_get_extmark_by_id(anchor.buf, ns, anchor.last, {})
+    if #first > 0 and #last > 0 then
+      return first[1] + 1, math.max(first[1], last[1]) + 1
+    end
+  end
+end
+
+persist_positions = function(buf)
+  local path = Path.canonical(vim.api.nvim_buf_get_name(buf))
+  local function update(items, root)
+    local changed = false
+    for _, item in ipairs(items) do
+      local anchor = anchors[root][item.id]
+      if anchor and anchor.buf == buf and Path.canonical(item.reference.path) == path then
+        local first, last = anchor_position(anchor)
+        if first and (item.reference.first ~= first or item.reference.last ~= last) then
+          item.reference.first, item.reference.last = first, last
+          changed = true
+        end
+      end
+    end
+    return changed
+  end
+
+  for root in pairs(sessions) do
+    local ok, err = pcall(function()
+      local session = M.get(root)
+      if update(session.items, root) then
+        save(session)
+      end
+      -- Undo must not restore line numbers from before the source file was saved.
+      for _, stack in pairs(history[root]) do
+        for _, change in ipairs(stack) do
+          update(change.before, root)
+          update(change.after, root)
+        end
+      end
+    end)
+    if not ok then
+      vim.notify(
+        'Could not save review positions: ' .. tostring(err),
+        vim.log.levels.ERROR,
+        { title = 'nvim-t3code-review' }
+      )
+    end
+  end
 end
 
 local function prune_anchors(root)
@@ -233,14 +291,8 @@ function M.location(root, id)
         anchor = anchors[session.root][id]
       end
 
-      local first, last = reference.first, reference.last
-      if anchor and vim.api.nvim_buf_is_loaded(anchor.buf) then
-        local start = vim.api.nvim_buf_get_extmark_by_id(anchor.buf, ns, anchor.first, {})
-        local finish = vim.api.nvim_buf_get_extmark_by_id(anchor.buf, ns, anchor.last, {})
-        if #start > 0 and #finish > 0 then
-          first, last = start[1] + 1, finish[1] + 1
-        end
-      end
+      local first, last = anchor_position(anchor)
+      first, last = first or reference.first, last or reference.last
 
       return {
         path = reference.path,

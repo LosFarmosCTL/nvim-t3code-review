@@ -170,6 +170,7 @@ assert(#prompt < 500 and #t3.session.items(root) == 1)
 local saved = dofile 'lua/t3code_review/session.lua'
 saved.setup { storage_dir = temp .. '/state' }
 assert(saved.items(root)[1].comment == 'Keep retry ownership in the service')
+t3.session.setup { storage_dir = temp .. '/state' }
 
 -- Hovering an unloaded file previews it temporarily and restores the main buffer.
 local preview_path = root .. '/other.lua'
@@ -462,6 +463,7 @@ local reloaded = dofile 'lua/t3code_review/session.lua'
 reloaded.setup { storage_dir = temp .. '/state' }
 assert(reloaded.items(history_root)[1].comment == 'Fourth replacement')
 assert(reloaded.undo(history_root) == 0)
+t3.session.setup { storage_dir = temp .. '/state' }
 
 -- Confirmed delivery discards both stacks, even when every comment changed during delivery.
 local submitted = t3.session.items(history_root)
@@ -470,6 +472,62 @@ t3.session.clear(history_root, submitted)
 assert(t3.session.undo(history_root) == 0 and t3.session.redo(history_root) == 0)
 assert(#t3.session.items(history_root) == 1 and t3.session.items(history_root)[1].id == fourth)
 vim.api.nvim_buf_delete(history_buf, { force = true })
+
+-- Saving source edits persists live ranges, including ranges retained by undo history.
+local position_root = temp .. '/positions'
+vim.fn.mkdir(position_root .. '/.git', 'p')
+local position_buf = vim.api.nvim_create_buf(true, false)
+vim.api.nvim_buf_set_name(position_buf, position_root .. '/file.lua')
+vim.api.nvim_buf_set_lines(position_buf, 0, -1, false, { 'header', 'first', 'second', 'footer' })
+local position_id = t3.session.add({
+  root = position_root,
+  path = position_root .. '/file.lua',
+  first = 2,
+  last = 3,
+  bufnr = position_buf,
+}, 'Keep this range')
+vim.api.nvim_buf_set_lines(position_buf, 0, 0, false, { 'inserted one', 'inserted two' })
+assert(t3.session.location(position_root, position_id).pos[1] == 4)
+assert(t3.session.items(position_root)[1].reference.first == 2)
+vim.api.nvim_buf_call(position_buf, function()
+  vim.cmd 'silent write'
+end)
+
+local restarted = dofile 'lua/t3code_review/session.lua'
+restarted.setup { storage_dir = temp .. '/state' }
+local persisted = restarted.items(position_root)[1]
+assert(persisted.reference.first == 4 and persisted.reference.last == 5)
+assert(restarted.location(position_root, position_id).pos[1] == 4)
+t3.session.setup { storage_dir = temp .. '/state' }
+
+-- Position updates do not add undo steps or overwrite edits to comment text.
+t3.session.edit(position_root, position_id, 'Updated feedback')
+vim.api.nvim_buf_set_lines(position_buf, 0, 0, false, { 'another insertion' })
+vim.api.nvim_buf_call(position_buf, function()
+  vim.cmd 'silent write'
+end)
+assert(t3.session.undo(position_root) == 1)
+persisted = t3.session.items(position_root)[1]
+assert(persisted.comment == 'Keep this range' and persisted.reference.first == 5 and persisted.reference.last == 6)
+
+t3.session.remove(position_root, position_id)
+vim.api.nvim_buf_set_lines(position_buf, 0, 0, false, { 'inserted while deleted' })
+vim.api.nvim_buf_call(position_buf, function()
+  vim.cmd 'silent write'
+end)
+assert(t3.session.undo(position_root) == 1)
+persisted = t3.session.items(position_root)[1]
+assert(persisted.reference.first == 6 and persisted.reference.last == 7)
+assert(t3.session.redo(position_root) == 1 and t3.session.undo(position_root) == 1)
+
+-- Unsaved movements must not replace positions corresponding to the file on disk.
+vim.api.nvim_buf_set_lines(position_buf, 0, 0, false, { 'not saved' })
+assert(t3.session.location(position_root, position_id).pos[1] == 7)
+local disk_review = vim.json.decode(
+  table.concat(vim.fn.readfile(temp .. '/state/' .. vim.fn.sha256(vim.uv.fs_realpath(position_root)) .. '.json'), '\n')
+)
+assert(disk_review.items[1].reference.first == 6 and disk_review.items[1].reference.last == 7)
+vim.api.nvim_buf_delete(position_buf, { force = true })
 
 trouble.close 't3_review'
 vim.fn.delete(temp, 'rf')
