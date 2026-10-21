@@ -49,6 +49,7 @@ function M.comment(opts)
   local saving = false
   local function close()
     if vim.api.nvim_win_is_valid(window) then
+      vim.cmd.stopinsert()
       vim.api.nvim_win_close(window, true)
     end
   end
