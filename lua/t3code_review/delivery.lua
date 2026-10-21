@@ -2,7 +2,7 @@ local Connection = require 't3code_review.connection'
 local Routing = require 't3code_review.routing'
 local M = {}
 
-local app = 'T3 Code (Nightly)'
+local app = 'T3 Code (Beta)'
 
 function M.setup(name)
   app = name or app

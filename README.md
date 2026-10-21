@@ -24,10 +24,10 @@ https://github.com/user-attachments/assets/5420ea42-c19b-4dc6-b85e-ef662ebc43f5
 - Neovim **0.11+**.
 - Node.js **22+** and npm.
 - [Trouble.nvim](https://github.com/folke/trouble.nvim) **v3**.
-- A running **local T3 Code** with Orchestrator V2 support (as of writing, this is only available in the nightly version), with your project registered in T3.
+- A running **local T3 Code** with Orchestrator V2 support (available in the stable beta release), with your project registered in T3.
 - Git for matching related worktrees and repositories.
 
-Draft handoff uses `open` on macOS and `xdg-open` on Linux. The default macOS application is `T3 Code (Nightly)`; change `app` if yours has a different name.
+Draft handoff uses `open` on macOS and `xdg-open` on Linux. The default macOS application is `T3 Code (Beta)`; change `app` if yours has a different name, such as `T3 Code (Nightly)`.
 
 ## 📦 Installation
 
@@ -157,7 +157,7 @@ With lazy.nvim, put overrides in `opts`. Otherwise, pass them to `setup()`:
 ```lua
 require('t3code_review').setup {
   icons = true, -- Set false to disable Nerd Font icons
-  app = 'T3 Code (Nightly)',
+  app = 'T3 Code (Beta)',
   connection = {
     node = 'node',
     auth_method = 'auto', -- 'auto', 'cli', or 'browser'

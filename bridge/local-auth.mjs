@@ -200,7 +200,7 @@ export async function approveLocally(
   if (!response.ok || typeof result.redirectTo !== "string") {
     fail(
       "LOCAL_APPROVAL_FAILED",
-      "T3 rejected local pairing approval. Check nightly compatibility or use browser authorization.",
+      "T3 rejected local pairing approval. Check T3 Code compatibility or use browser authorization.",
     );
   }
 
