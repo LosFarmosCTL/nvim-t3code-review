@@ -16,6 +16,13 @@ function M.open(root, opts)
       if view.win.buf then
         vim.b[view.win.buf].t3_review_root = root
       end
+      if view.win.win and vim.api.nvim_win_is_valid(view.win.win) then
+        vim.api.nvim_win_call(view.win.win, function()
+          -- Keep the header on the panel's surface without changing other windows.
+          vim.opt_local.winhighlight:append { WinBar = 'TroubleNormal', WinBarNC = 'TroubleNormalNC' }
+          view.win.opts.wo.winhighlight = vim.wo.winhighlight
+        end)
+      end
     end)
   end
 
